@@ -6,8 +6,8 @@
 * This software is provided "as is" without express or implied warranty.
 * Use it at your own risk
 *--------------------------------------------------------------------------------------
-* Version: 1.17
-* Date   : 2016.12.21
+* Version: 2.0
+* Date   : 2020.11.07
 * Author : VFPEncoding
 * Email  : vfpencoding@gmail.com
 *
@@ -15,8 +15,9 @@
 *          Guillermo Carrero (QEPD) (Barcelona, Spain) and
 *          Luis Maria Guayan (Tucuman, Argentina)
 *--------------------------------------------------------------------------------------
-* Note   : This application use the free library BarCodeLibrary.DLL
-*          of Dario Alvarez Aranda (Mexico)
+* Note   : This application use the libraries
+*          BarCodeLibrary.dll (by: Dario Alvarez Aranda, Mexico)
+*          QRCodeLib.dll (visit: www.validacfd.com)
 *--------------------------------------------------------------------------------------
 
 *--------------------------------------------------------------------------------------
@@ -28,25 +29,28 @@ DEFINE CLASS FoxBarcodeQR AS CUSTOM
   m.cAppPath = "" && App folder
   m.lDeleteTempFiles = .T. && Delete the temporary folder and image files
 
+  m.nVersion = 2.00 && Version
+  m.lAutoConfigurate = .T.
+  m.lAutoFit = .F.
+  m.nBackColor = RGB(255,255,255) && White
+  m.nBarColor = RGB(0,0,0) && Black
+  m.nCorrectionLevel = 1 && Medium 15%
+  m.nEncoding = 4 && Automatic encoding algorithm
+  m.nMarginPixels = 0 && pixels
+  m.nModuleWidth = 5 && pixels
+  m.nHeight = 200
+  m.nWidth = 200
+
   *---------------------------------------------------------
   * PROCEDURE QRBarcodeImage()
   *---------------------------------------------------------
-  * Generated QR Barcode image with BarCodeLibrary.DLL
+  * Generated QR Barcode image with BarCodeLibrary.dll
   *  Parameters:
   *   tcText: Text to encode
   *   tcFile: Imagen File Name (optional)
   *   tnSize: Imagen Size [2..12] (default = 4)
-  *     2 = 66 x 66 (in pixels)
-  *     3 = 99 x 99
-  *     4 = 132 x 132
-  *     5 = 165 x 165
-  *     6 = 198 x 198
-  *     7 = 231 x 231
-  *     8 = 264 x 264
-  *     9 = 297 x 297
-  *    10 = 330 x 330
-  *    11 = 363 x 363
-  *    12 = 396 x 396
+  *     (Width in pixels is tnSize x 33 pixels)
+  *     (tnSize = 4 -> 132 x 132 pixels)
   *   tnType: Imagen Type [BMP, JPG or PNG] (default = 0)
   *     0 = BMP
   *     1 = JPG
@@ -75,25 +79,157 @@ DEFINE CLASS FoxBarcodeQR AS CUSTOM
       m.tcFile = FORCEEXT(m.lcFolder + SYS(2015), m.lcType)
     ELSE
       m.lcFolder = JUSTPATH(m.tcFile)
-      IF NOT DIRECTORY(m.lcFolder)
+      IF NOT DIRECTORY(m.lcFolder) AND NOT EMPTY(m.lcFolder)
         MD (m.lcFolder)
       ENDIF
       m.tcFile = FORCEEXT(m.tcFile, m.lcType)
     ENDIF
 
-    *- Declare the functions of BarCodeLibrary.dll
-    DECLARE INTEGER GenerateFile IN BarCodeLibrary.DLL ;
+    *-- Declare the functions of BarCodeLibrary.dll
+    DECLARE INTEGER GenerateFile IN "BarCodeLibrary.dll" ;
       STRING cData, STRING cFileName
 
-    DECLARE INTEGER SetConfiguration IN BarCodeLibrary.DLL ;
+    DECLARE INTEGER SetConfiguration IN "BarCodeLibrary.dll" ;
       INTEGER nSize, INTEGER nImageType
 
     SetConfiguration(m.tnSize, m.tnType)
     GenerateFile(m.tcText, m.tcFile)
 
-    CLEAR DLLS SetConfiguration, GenerateFile
+    CLEAR DLLS "SetConfiguration", "GenerateFile"
 
     RETURN m.tcFile
+  ENDPROC
+
+  *---------------------------------------------------------
+  * PROCEDURE FullQRCodeImage()
+  *---------------------------------------------------------
+  * Generated QR Barcode image with QRCodeLib.dll (visit: www.validacfd.com)
+  *  Parameters:
+  *   tcText: Text to encode
+  *   tcFile: Imagen File Name (optional)
+  *   tnSize: Imagen Size in pixels
+  *   tnType: Imagen Type [Only 0=BMP]
+  *---------------------------------------------------------
+  PROCEDURE FullQRCodeImage(tcText, tcFile, tnSize, tnType)
+    LOCAL lcType, lcFolder
+
+    IF VARTYPE(m.tnSize) <> "N"
+      m.tnSize = 200
+    ENDIF
+    m.tnSize = MIN(MAX(m.tnSize, 64), 1280)
+    STORE m.tnSize TO THIS.nHeight, THIS.nWidth
+
+    *-- Only BMP type
+    *!* IF VARTYPE(m.tnType) <> "N"
+    m.tnType = 0
+    m.lcType = "BMP"
+    *!* ENDIF
+
+    IF EMPTY(m.tcFile)
+      m.lcFolder = THIS.cTempPath
+      IF NOT DIRECTORY(m.lcFolder)
+        MD (m.lcFolder)
+      ENDIF
+      m.tcFile = FORCEEXT(m.lcFolder + SYS(2015), m.lcType)
+    ELSE
+      m.lcFolder = JUSTPATH(m.tcFile)
+      IF NOT DIRECTORY(m.lcFolder) AND NOT EMPTY(m.lcFolder)
+        MD (m.lcFolder)
+      ENDIF
+      m.tcFile = FORCEEXT(m.tcFile, m.lcType)
+    ENDIF
+    CLEAR RESOURCES m.tcFile
+
+    *-- Declare the functions of QRCodeLib.dll (visit: www.validacfd.com)
+    DECLARE FullQRCode IN "QRCodeLib.dll" ;
+      INTEGER lAutoConfigurate, ;
+      INTEGER lAutoFit, ;
+      LONG nBackColor, ;
+      LONG nBarColor, ;
+      STRING cText, ;
+      INTEGER nCorrectionLevel, ;
+      INTEGER nEncoding, ;
+      INTEGER nMarginPixels, ;
+      INTEGER nModuleWidth, ;
+      INTEGER nHeight, ;
+      INTEGER nWidth, ;
+      STRING cFileName
+
+    FullQRCode(THIS.lAutoConfigurate, THIS.lAutoFit, THIS.nBackColor, THIS.nBarColor, ;
+      m.tcText, THIS.nCorrectionLevel, THIS.nEncoding, THIS.nMarginPixels, THIS.nModuleWidth, ;
+      THIS.nHeight, THIS.nWidth, m.tcFile)
+
+    CLEAR DLLS "FullQRCode"
+
+    RETURN m.tcFile
+  ENDPROC
+
+
+  *---------------------------------------------------------
+  * PROCEDURE FastQRCodeImage()
+  *---------------------------------------------------------
+  * Generated QR Barcode image with QRCodeLib.dll (visit: www.validacfd.com)
+  *  Parameters:
+  *   tcText: Text to encode
+  *   tcFile: Imagen File Name (optional)
+  *---------------------------------------------------------
+  PROCEDURE FastQRCodeImage(tcText, tcFile)
+    LOCAL lcFolder, lcType
+
+    *-- Only BMP type
+    m.lcType = "BMP"
+
+    IF EMPTY(m.tcFile)
+      m.lcFolder = THIS.cTempPath
+      IF NOT DIRECTORY(m.lcFolder)
+        MD (m.lcFolder)
+      ENDIF
+      m.tcFile = FORCEEXT(m.lcFolder + SYS(2015), m.lcType)
+    ELSE
+      m.lcFolder = JUSTPATH(m.tcFile)
+      IF NOT DIRECTORY(m.lcFolder) AND NOT EMPTY(m.lcFolder)
+        MD (m.lcFolder)
+      ENDIF
+      m.tcFile = FORCEEXT(m.tcFile, m.lcType)
+    ENDIF
+    CLEAR RESOURCES m.tcFile
+
+    *-- Declare the functions of QRCodeLib.dll (visit: www.validacfd.com)
+    DECLARE FastQRCode IN "QRCodeLib.dll" ;
+      STRING cText, ;
+      STRING cFileName
+
+    FastQRCode(m.tcText, m.tcFile)
+
+    CLEAR DLLS "FastQRCode"
+
+    RETURN m.tcFile
+  ENDPROC
+
+  *------------------------------------------------------
+  * PROCEDURE QRCodeVersion()
+  *------------------------------------------------------
+  * Returns the version of the QRCodeLib.dll library
+  *------------------------------------------------------ 
+  PROCEDURE QRCodeVersion()
+    LOCAL lcVersion
+    DECLARE STRING QRCodeLibVer IN "QRCodeLib.dll"
+    m.lcVersion = QRCodeLibVer()
+    CLEAR DLLS "QRCodeLibVer"
+    RETURN m.lcVersion
+  ENDPROC
+  
+  *------------------------------------------------------
+  * PROCEDURE QRBarcodeVersion()
+  *------------------------------------------------------
+  * Returns the version of the BarCodeLibrary.dll library
+  *------------------------------------------------------ 
+  PROCEDURE QRBarcodeVersion()
+    LOCAL lcVersion
+    DECLARE INTEGER LibraryVersion IN "BarCodeLibrary.dll" 
+        m.lcVersion = LibraryVersion()
+    CLEAR DLLS "LibraryVersion"
+    RETURN m.lcVersion
   ENDPROC
 
   *------------------------------------------------------
